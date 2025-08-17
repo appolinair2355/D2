@@ -11,7 +11,7 @@ class CardPredictor:
         self.processed_messages = set()  # Pour éviter les doublons
         self.status_log = []  # Historique des statuts
         self.prediction_messages = {}  # Stockage des IDs de messages de prédiction
-        self.trigger_numbers = [5, 7, 8]  # Numéros déclencheurs
+        # Système As uniquement (plus de numéros déclencheurs)
         
     def reset(self):
         """Reset all prediction data"""
@@ -70,51 +70,70 @@ class CardPredictor:
         return ''.join(sorted(set(suits)))
 
     def should_predict(self, message: str) -> Tuple[bool, Optional[int], Optional[str]]:
-        """Determine if a prediction should be made based on the message"""
+        """Determine if a prediction should be made based on the message - LOGIQUE As"""
         try:
             # Extract game number
             game_number = self.extract_game_number(message)
             if game_number is None:
                 return False, None, None
 
-            # Check if already processed
-            if game_number in self.prediction_status:
-                return False, None, None
-
-            # Only predict for games ending in trigger numbers (5, 7, 8)
-            # We predict in advance for the next game ending in 0
-            last_digit = game_number % 10
-            if last_digit not in self.trigger_numbers:
-                return False, None, None
-
-            # Extract symbols from parentheses
+            # Extract symbols from parentheses first to check for Ace trigger
             matches = self.extract_symbols_from_parentheses(message)
-            if not matches:
+            if len(matches) < 2:
+                print(f"❌ Pas assez de groupes de parenthèses (besoin de 2): {matches}")
                 return False, None, None
 
-            # Get first group of symbols
             first_group = matches[0]
+            second_group = matches[1]
+            
+            # NOUVELLE LOGIQUE: Vérifier la présence d'As (A) dans les groupes
+            has_ace_first = 'A' in first_group
+            has_ace_second = 'A' in second_group
+            
+            print(f"🎯 Analyse As: Premier groupe='{first_group}' (As: {has_ace_first}), Deuxième groupe='{second_group}' (As: {has_ace_second})")
+            
+            # RÈGLES DE DÉCLENCHEMENT:
+            # 1. Prédire SEULEMENT si As dans le PREMIER groupe
+            # 2. NE PAS prédire si As dans le DEUXIÈME groupe  
+            # 3. NE PAS prédire si As dans les DEUX groupes
+            if not has_ace_first:
+                print(f"❌ Pas d'As dans le premier groupe, pas de prédiction")
+                return False, None, None
+                
+            if has_ace_second:
+                print(f"❌ As détecté dans le deuxième groupe, prédiction bloquée")
+                return False, None, None
+            
+            print(f"✅ Condition As validée: As dans premier groupe uniquement")
+
+            # Calculate predicted game number (jeu suivant)
+            predicted_game = game_number + 1
+            
+            # ANTI-DOUBLON: Check if predicted game already has a prediction (any status)
+            if predicted_game in self.prediction_status:
+                print(f"❌ Prédiction déjà existante pour le jeu #{predicted_game} (statut: {self.prediction_status[predicted_game]}), ignoré")
+                return False, None, None
+            
+            # Check if current game already processed
+            if game_number in self.processed_messages:
+                print(f"Jeu #{game_number} déjà traité, ignoré")
+                return False, None, None
+
+            # Get suits from first group
             suits = self.normalize_suits(first_group)
             
             if not suits:
                 return False, None, None
 
-            # Check for message duplication
-            message_hash = hash(message.strip())
-            if message_hash in self.processed_messages:
-                self.prediction_status[game_number] = 'déjà traité'
-                return False, None, None
-
-            # Mark as processed and create prediction
-            self.processed_messages.add(message_hash)
+            # Mark current game as processed
+            self.processed_messages.add(game_number)
             
-            # Always predict for the next game ending in 0
-            predicted_game = ((game_number // 10) + 1) * 10
-            
+            # Create prediction for target game
             self.prediction_status[predicted_game] = '⌛'
             self.last_predictions.append((predicted_game, suits))
             
-            print(f"Prédiction créée: Jeu #{predicted_game} -> {suits} (basée sur #{game_number})")
+            print(f"✅ Prédiction créée: Jeu #{predicted_game} -> {suits} (déclenchée par #{game_number} avec As dans premier groupe)")
+            print(f"📊 Prédictions actives: {[k for k, v in self.prediction_status.items() if v == '⌛']}")
             return True, predicted_game, suits
 
         except Exception as e:
@@ -154,8 +173,8 @@ class CardPredictor:
                 return (self.count_total_cards(first_group) == 2 and 
                         self.count_total_cards(second_group) == 2)
 
-            # Check for pending predictions within offset range
-            for offset in range(3):  # Check 0, 1, 2 games back
+            # Check for pending predictions within offset range (0, 1, 2, 3)
+            for offset in range(4):  # Check 0, 1, 2, 3 games back
                 target_number = game_number - offset
                 
                 if (target_number in self.prediction_status and 
@@ -167,12 +186,44 @@ class CardPredictor:
                             statut = '✅0️⃣'  # Perfect timing
                         elif offset == 1:
                             statut = '✅1️⃣'  # 1 game late
-                        else:
+                        elif offset == 2:
                             statut = '✅2️⃣'  # 2 games late
+                        else:
+                            statut = '✅3️⃣'  # 3 games late
                             
                         self.prediction_status[target_number] = statut
                         self.status_log.append((target_number, statut))
                         print(f"Prédiction réussie: Jeu #{target_number} avec offset {offset}")
+                        return True, target_number
+            
+            # No matching predictions found
+            return None, None
+
+        except Exception as e:
+            print(f"Erreur dans verify_prediction: {e}")
+            return None, None
+    
+    def check_expired_predictions(self, current_game_number: int) -> List[int]:
+        """Check for expired predictions (offset > 3) and mark them as failed"""
+        expired_predictions = []
+        
+        for pred_num, status in list(self.prediction_status.items()):
+            if status == '⌛' and current_game_number > pred_num + 3:  # Changé de 2 à 3
+                # Marquer comme échouée
+                self.prediction_status[pred_num] = '❌❌'
+                self.status_log.append((pred_num, '❌❌'))
+                expired_predictions.append(pred_num)
+                print(f"❌ Prédiction expirée: #{pred_num} marquée comme échouée (jeu actuel: #{current_game_number})")
+        
+        return expired_predictions
+
+    def is_pending_edit_message(self, message: str) -> Tuple[bool, Optional[int]]:
+        """Check if message is pending edit (contains ⏰ or 🕐)"""
+        game_number = self.extract_game_number(message)
+        if game_number and ("⏰" in message or "🕐" in message):
+            print(f"🔄 Message #{game_number} en cours d'édition détecté: ⏰ ou 🕐")
+            return True, game_number
+        return False, None
                         return True, target_number
                     else:
                         # Failed prediction

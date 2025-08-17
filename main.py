@@ -299,6 +299,7 @@ async def start_command(event):
 
 • `/sta` - Statut des déclencheurs (admin)
 • `/reset` - Réinitialiser (admin)
+• `/ni` - Pack deployer50 modifié (admin)
 • `/deploy` - Pack de déploiement 2D (admin)
 
 Le bot est prêt à analyser vos jeux ! 🚀"""
@@ -619,6 +620,106 @@ Configuration sauvegardée automatiquement.""")
     except Exception as e:
         print(f"Erreur dans set_prediction_interval: {e}")
         await event.respond(f"❌ Erreur: {e}")
+
+@client.on(events.NewMessage(pattern='/ni'))
+async def generate_ni_package(event):
+    """Génère le package deployer50 avec fichiers modifiés (admin uniquement)"""
+    try:
+        if event.sender_id != ADMIN_ID:
+            return
+
+        await event.respond("🚀 **Génération Package deployer50 modifié...**")
+        
+        try:
+            # Créer le package ZIP avec nom correct
+            package_name = 'deployer50.zip'
+            
+            with zipfile.ZipFile(package_name, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                # Fichiers principaux avec logique As correcte
+                files_to_include = [
+                    'main.py', 'render_main_deployer50.py', 'render_predictor.py', 
+                    'yaml_database.py', 'predictor.py', 'scheduler.py', 
+                    'README_RENDER.md', 'DEPLOYMENT_GUIDE.md', 'DEPLOYER50_VERIFICATION.md'
+                ]
+                
+                for file_path in files_to_include:
+                    if os.path.exists(file_path):
+                        zipf.write(file_path)
+                
+                # requirements.txt SANS PostgreSQL
+                requirements_content = """telethon==1.35.0
+aiohttp==3.9.5
+python-dotenv==1.0.1
+pyyaml==6.0.1"""
+                zipf.writestr('requirements.txt', requirements_content)
+                
+                # .env.example avec PREDICTION_INTERVAL
+                env_content = f"""API_ID=29177661
+API_HASH=a8639172fa8d35dbfd8ea46286d349ab
+BOT_TOKEN=7815360317:AAGsrFzeUZrHOjujf5aY2UjlBj4GOblHSig
+ADMIN_ID=1190237801
+PORT=10000
+PREDICTION_INTERVAL={prediction_interval}"""
+                zipf.writestr('.env.example', env_content)
+                
+                # render.yaml avec commandes correctes
+                render_yaml = """services:
+  - type: web
+    name: telegram-card-bot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python render_main_deployer50.py"
+    plan: free
+    region: frankfurt
+    envVars:
+      - key: API_ID
+        sync: false
+      - key: API_HASH
+        sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: ADMIN_ID
+        sync: false
+      - key: PORT
+        fromGroup: web
+    healthCheckPath: "/health\""""
+                zipf.writestr('render.yaml', render_yaml)
+                
+                # runtime.txt pour spécifier la version Python
+                runtime_content = "python-3.11.4"
+                zipf.writestr('runtime.txt', runtime_content)
+            
+            file_size = os.path.getsize(package_name) / 1024
+            
+            # Envoyer le message de confirmation
+            await event.respond(f"""✅ **PACKAGE DEPLOYER50 MODIFIÉ CRÉÉ!**
+
+📦 **Fichier**: deployer50.zip ({file_size:.1f} KB)  
+🎯 **Logique As**: CORRIGÉE - Un seul A dans premier groupe
+🚫 **Bilan**: SUPPRIMÉ complètement
+🗄️ **Base**: YAML uniquement (PostgreSQL supprimé)
+📊 **Vérification**: Étendue offsets 0-3
+🔧 **Render.com**: Prêt avec port 10000
+
+**RÈGLES As IMPLÉMENTÉES:**
+• ✅ Prédiction si A dans 1er groupe seulement  
+• ❌ Pas de prédiction si A dans 2ème groupe
+• ❌ Pas de prédiction si 2 A dans 1er groupe""")
+            
+            # Envoyer le fichier ZIP en pièce jointe
+            await client.send_file(
+                event.chat_id,
+                package_name,
+                caption="📦 **Package deployer50 modifié** - Logique As corrigée + sans bilan"
+            )
+            
+            print(f"✅ Package deployer50.zip modifié créé: {file_size:.1f} KB")
+            
+        except Exception as e:
+            await event.respond(f"❌ Erreur création: {str(e)}")
+
+    except Exception as e:
+        print(f"Erreur /ni: {e}")
 
 @client.on(events.NewMessage(pattern='/deploy'))
 async def generate_deploy_package(event):
