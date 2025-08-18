@@ -87,27 +87,24 @@ class CardPredictor:
             second_group = matches[1]
             
             # NOUVELLE LOGIQUE: Vérifier la présence d'As (A) dans les groupes
-            ace_count_first = first_group.count('A')
-            ace_count_second = second_group.count('A')
+            has_ace_first = 'A' in first_group
+            has_ace_second = 'A' in second_group
             
-            print(f"🎯 Analyse As: Premier groupe='{first_group}' (As: {ace_count_first}), Deuxième groupe='{second_group}' (As: {ace_count_second})")
+            print(f"🎯 Analyse As: Premier groupe='{first_group}' (As: {has_ace_first}), Deuxième groupe='{second_group}' (As: {has_ace_second})")
             
-            # RÈGLES DE DÉCLENCHEMENT STRICTES:
-            # 1. Prédire SEULEMENT si EXACTEMENT 1 As dans le PREMIER groupe
+            # RÈGLES DE DÉCLENCHEMENT:
+            # 1. Prédire SEULEMENT si As dans le PREMIER groupe
             # 2. NE PAS prédire si As dans le DEUXIÈME groupe  
-            # 3. NE PAS prédire si 2 ou plus As dans le PREMIER groupe
-            if ace_count_first != 1:
-                if ace_count_first == 0:
-                    print(f"❌ Pas d'As dans le premier groupe, pas de prédiction")
-                else:
-                    print(f"❌ {ace_count_first} As détectés dans le premier groupe (il faut exactement 1), pas de prédiction")
+            # 3. NE PAS prédire si As dans les DEUX groupes
+            if not has_ace_first:
+                print(f"❌ Pas d'As dans le premier groupe, pas de prédiction")
                 return False, None, None
                 
-            if ace_count_second > 0:
-                print(f"❌ {ace_count_second} As détecté(s) dans le deuxième groupe, prédiction bloquée")
+            if has_ace_second:
+                print(f"❌ As détecté dans le deuxième groupe, prédiction bloquée")
                 return False, None, None
             
-            print(f"✅ Condition As validée: EXACTEMENT 1 As dans premier groupe uniquement")
+            print(f"✅ Condition As validée: As dans premier groupe uniquement")
 
             # Calculate predicted game number (jeu suivant)
             predicted_game = game_number + 1

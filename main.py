@@ -702,16 +702,15 @@ PREDICTION_INTERVAL={prediction_interval}"""
 🔧 **Render.com**: Prêt avec port 10000
 
 **RÈGLES As IMPLÉMENTÉES:**
-• ✅ Prédiction si EXACTEMENT 1 A dans 1er groupe  
+• ✅ Prédiction si A dans 1er groupe seulement  
 • ❌ Pas de prédiction si A dans 2ème groupe
-• ❌ Pas de prédiction si 2+ A dans 1er groupe
-• ⏳ Intervalle: {prediction_interval}min avant diffusion""")
+• ❌ Pas de prédiction si 2 A dans 1er groupe""")
             
             # Envoyer le fichier ZIP en pièce jointe
             await client.send_file(
                 event.chat_id,
                 package_name,
-                caption="📦 **Package deployer50 modifié** - Logique As STRICTE + Intervalle fonctionnel"
+                caption="📦 **Package deployer50 modifié** - Logique As corrigée + sans bilan"
             )
             
             print(f"✅ Package deployer50.zip modifié créé: {file_size:.1f} KB")
@@ -870,11 +869,6 @@ async def handle_messages(event):
             # Message de prédiction selon le nouveau format demandé
             prediction_text = f"🔵{predicted_game}— 3D🔵 statut :⌛"
 
-            # ATTENDRE L'INTERVALLE CONFIGURÉ avant diffusion
-            print(f"⏳ Attente de {prediction_interval} minute(s) avant diffusion de la prédiction #{predicted_game}")
-            import asyncio
-            await asyncio.sleep(prediction_interval * 60)  # Convertir minutes en secondes
-
             sent_messages = await broadcast(prediction_text)
 
             # Store message IDs for later editing
@@ -882,18 +876,13 @@ async def handle_messages(event):
                 for chat_id, message_id in sent_messages:
                     predictor.store_prediction_message(predicted_game, message_id, chat_id)
 
-            print(f"✅ Prédiction générée après édition finale pour le jeu #{predicted_game}: {suit} (après attente de {prediction_interval}min)")
+            print(f"✅ Prédiction générée après édition finale pour le jeu #{predicted_game}: {suit}")
         else:
             # 3. Traitement normal des messages (pas d'édition en cours)
             predicted, predicted_game, suit = predictor.should_predict(message_text)
             if predicted:
                 # Message de prédiction manuelle selon le nouveau format demandé
                 prediction_text = f"🔵{predicted_game}— 3D🔵 statut :⌛"
-
-                # ATTENDRE L'INTERVALLE CONFIGURÉ avant diffusion
-                print(f"⏳ Attente de {prediction_interval} minute(s) avant diffusion de la prédiction #{predicted_game}")
-                import asyncio
-                await asyncio.sleep(prediction_interval * 60)  # Convertir minutes en secondes
 
                 sent_messages = await broadcast(prediction_text)
 
@@ -902,7 +891,7 @@ async def handle_messages(event):
                     for chat_id, message_id in sent_messages:
                         predictor.store_prediction_message(predicted_game, message_id, chat_id)
 
-                print(f"✅ Prédiction manuelle générée pour le jeu #{predicted_game}: {suit} (après attente de {prediction_interval}min)")
+                print(f"✅ Prédiction manuelle générée pour le jeu #{predicted_game}: {suit}")
 
         # Check for prediction verification (manuel + automatique)
         verified, number = predictor.verify_prediction(message_text)
